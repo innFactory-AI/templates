@@ -32,7 +32,7 @@ jobs:
       - name: Update values.yaml with new version
         uses: mikefarah/yq@master
         with:
-          cmd: yq -i '.${{ inputs.service }}.image.tag = "${{ inputs.version }}"' 'k8s/charts/values.yaml'
+          cmd: yq -i '.image.tag = "${{ inputs.version }}"' 'k8s/charts/values.yaml'
 
       - name: Commit Chart.yaml
         run: |
