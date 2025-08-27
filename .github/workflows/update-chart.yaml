@@ -1,0 +1,45 @@
+name: Update Helm Chart
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  updateHelmChart:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Update Chart.yaml with new version
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.version = "${{ inputs.version }}"' 'k8s/charts/Chart.yaml'
+
+      - name: Update values.yaml with new version
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.${{ inputs.service }}.image.tag = "${{ inputs.version }}"' 'k8s/charts/values.yaml'
+
+      - name: Commit Chart.yaml
+        run: |
+          git config --local user.email "m.boehrer@innfactory.ai"
+          git config --local user.name "innfactory-ai-bot"
+          git pull origin main
+          git add k8s/charts/Chart.yaml k8s/charts/values.yaml
+          git commit -m "chore: Update chart for version ${{ inputs.version }}"
+          git push origin main
+          git log -1

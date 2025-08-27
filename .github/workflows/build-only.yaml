@@ -1,4 +1,4 @@
-name: Build and Deploy Docker Container
+name: Build Only
 
 on:
   workflow_call:
@@ -21,15 +21,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-      - name: show contents
-        run: ls -la
-      - name: show dist
-        run: ls -la dist
       - name: Log into registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
