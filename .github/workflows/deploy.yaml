@@ -1,0 +1,50 @@
+name: Build and Deploy Docker Container
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+
+jobs:
+  deploy:
+    name: Build and publish docker image
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - name: show contents
+        run: ls -la
+      - name: show dist
+        run: ls -la dist
+      - name: Log into registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: "ghcr.io"
+          username: ${{ github.actor }}
+          password: ${{ secrets.token }}
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ inputs.service }} .
+          docker tag ${{ inputs.service }} ghcr.io/innFactory-AI/${{ inputs.namespace }}-${{ inputs.service }}:latest
+          docker push ghcr.io/rcktsftwr/${{ inputs.namespace }}-${{ inputs.service }}:latest
+          docker tag ${{ inputs.service }} ghcr.io/rcktsftwr/${{ inputs.namespace }}-${{ inputs.service }}:${{ inputs.version }}
+          docker push ghcr.io/rcktsftwr/${{ inputs.namespace }}-${{ inputs.service }}:${{ inputs.version }}
