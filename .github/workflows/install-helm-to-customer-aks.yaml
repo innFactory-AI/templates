@@ -1,0 +1,121 @@
+name: Install Helm Chart To Customer AKS
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      namespace:
+        required: false
+        type: string
+    secrets:
+      token:
+        required: true
+      AZURE_SECRETS:
+        required: true
+      CLUSTER_NAME:
+        required: true
+      RESOURCE_GROUP:
+        required: true
+      REGISTRY:
+        required: true
+
+env:
+  IMAGE_NAME: ${{ inputs.image-name }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Azure credentials
+      run: |
+        # Parse AZURE_SECRETS and export variables
+        echo "${{ secrets.AZURE_SECRETS }}" | while IFS= read -r line; do
+          if [[ $line == export* ]]; then
+            # Remove 'export ' prefix and any comments
+            var_assignment=$(echo "$line" | sed 's/^export //' | sed 's/ *#.*//')
+            if [[ $var_assignment == *=* ]]; then
+              echo "$var_assignment" >> $GITHUB_ENV
+            fi
+          fi
+        done
+
+    - name: Validate Azure credentials
+      run: |
+        if [ -z "$ARM_CLIENT_ID" ]; then
+          echo "ARM_CLIENT_ID is empty. Exiting."
+          exit 1
+        fi
+        if [ -z "$ARM_CLIENT_SECRET" ]; then
+          echo "ARM_CLIENT_SECRET is empty. Exiting."
+          exit 1
+        fi
+        if [ -z "$ARM_TENANT_ID" ]; then
+          echo "ARM_TENANT_ID is empty. Exiting."
+          exit 1
+        fi
+        if [ -z "$ARM_SUBSCRIPTION_ID" ]; then
+          echo "ARM_SUBSCRIPTION_ID is empty. Exiting."
+          exit 1
+        fi
+        echo "Azure credentials validated successfully"
+        echo "- Tenant ID: $ARM_TENANT_ID"
+        echo "- Subscription ID: $ARM_SUBSCRIPTION_ID"
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: |
+          {
+            "clientId": "${{ env.ARM_CLIENT_ID }}",
+            "clientSecret": "${{ env.ARM_CLIENT_SECRET }}",
+            "subscriptionId": "${{ env.ARM_SUBSCRIPTION_ID }}",
+            "tenantId": "${{ env.ARM_TENANT_ID }}"
+          }
+
+    - name: Login to Azure Container Registry
+      run: |
+        az acr login --name ${{ secrets.REGISTRY }}
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Install kubelogin
+      run: |
+        curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.32/kubelogin-linux-amd64.zip"
+        unzip kubelogin-linux-amd64.zip
+        sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+        rm -rf kubelogin-linux-amd64.zip bin/
+
+    - name: Configure kubectl
+      run: |
+        az aks get-credentials --resource-group ${{ secrets.RESOURCE_GROUP }} --name ${{ secrets.CLUSTER_NAME }}
+        kubelogin convert-kubeconfig -l azurecli
+
+    - name: Create namespace
+      run: |
+        kubectl create namespace ${{ inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy to Kubernetes
+      run: |
+        helm upgrade --install ${{ inputs.image-name }} ./k8s/charts \
+          --namespace ${{ inputs.namespace }} \
+          --values ./k8s/charts/values.yaml \
+          --wait
+
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/schichtplan-demo -n ${{ inputs.namespace }}
+        kubectl get pods -n ${{ inputs.namespace }}
+        kubectl get services -n ${{ inputs.namespace }}
+        kubectl get ingress -n ${{ inputs.namespace }}
