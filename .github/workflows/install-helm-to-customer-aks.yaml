@@ -102,6 +102,11 @@ jobs:
         az aks get-credentials --resource-group ${{ secrets.RESOURCE_GROUP }} --name ${{ secrets.CLUSTER_NAME }}
         kubelogin convert-kubeconfig -l azurecli
 
+    - name: Update Chart.yaml with correct image name and registry
+      uses: mikefarah/yq@master
+      with:
+        cmd: yq -i '.image.repository = "${{ secrets.REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}"' 'k8s/charts/values.yaml'
+
     - name: Create namespace
       run: |
         kubectl create namespace ${{ inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
