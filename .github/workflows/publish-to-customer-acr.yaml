@@ -9,9 +9,6 @@ on:
       version:
         required: true
         type: string
-      namespace:
-        required: false
-        type: string
     secrets:
       token:
         required: true
@@ -34,6 +31,16 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist
+    - name: show contents
+      run: ls -la
+    - name: show dist
+      run: ls -la dist
 
     - name: Setup Azure credentials
       run: |
