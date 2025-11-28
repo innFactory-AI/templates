@@ -1,0 +1,48 @@
+name: Publish Helm Chart to GHCR
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      namespace:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
+
+env:
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  updateHelmChart:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: "refs/heads/main"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Log into registry
+        uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+        with:
+          registry: "ghcr.io"
+          username: ${{ github.actor }}
+          password: ${{ secrets.token }}
+
+      - name: Package chart
+        run: |
+          helm package k8s/charts
+
+      - name: Publish chart
+        run: |
+          helm push ${{ inputs.service}}-${{ inputs.version }}.tgz oci://ghcr.io/innfactory-ai/charts-${{ inputs.namespace }}
