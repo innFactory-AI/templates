@@ -42,4 +42,4 @@ jobs:
 
       - name: Publish chart
         run: |
-          helm push ${{ inputs.service}}-${{ inputs.version }}.tgz oci://ghcr.io/innfactory-ai/charts/${{ inputs.service }}
+          helm push ${{ inputs.service}}-${{ inputs.version }}.tgz oci://ghcr.io/innfactory-ai/charts
