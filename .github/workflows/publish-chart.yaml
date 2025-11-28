@@ -6,9 +6,6 @@ on:
       service:
         required: true
         type: string
-      namespace:
-        required: true
-        type: string
       version:
         required: true
         type: string
@@ -45,4 +42,4 @@ jobs:
 
       - name: Publish chart
         run: |
-          helm push ${{ inputs.service}}-${{ inputs.version }}.tgz oci://ghcr.io/innfactory-ai/charts-${{ inputs.namespace }}
+          helm push ${{ inputs.service}}-${{ inputs.version }}.tgz oci://ghcr.io/innfactory-ai/charts/${{ inputs.service }}
