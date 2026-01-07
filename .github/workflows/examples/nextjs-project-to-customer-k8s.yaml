@@ -1,0 +1,84 @@
+name: Example - Next.js Project to Customer K8s
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  version:
+    name: Create Version
+    runs-on: ubuntu-latest
+    permissions: write-all
+    outputs:
+      version: ${{ steps.semantic-release.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: go-semantic-release/action@v1
+        id: semantic-release
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-file: package.json
+          changelog-generator-opt: "emojis=true"
+  buildDockerImage:
+    name: Build and Publish Docker Image to AKS
+    needs: [version]
+    uses: innFactory-AI/templates/.github/workflows/publish-to-customer-acr-without-prior-build.yaml@main
+    permissions: write-all
+    with:
+      image-name: "CHANGE-ME"
+      version: ${{ needs.version.outputs.version }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN}}
+      AZURE_SECRETS: ${{ secrets.AZURE_SECRETS }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      REGISTRY: ${{ secrets.REGISTRY }}
+  updateHelmChart:
+    name: Update Helm Chart
+    needs: [buildDockerImage, version]
+    uses: innFactory-AI/templates/.github/workflows/update-chart.yaml@main
+    permissions: write-all
+    with:
+      service: "CHANGE-ME"
+      version: ${{ needs.version.outputs.version }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN}}
+  generateSecrets:
+    name: Generate Application Secrets
+    uses: innFactory-AI/templates/.github/workflows/create-secrets.yaml@main
+    permissions: write-all
+    with:
+      namespace: "CHANGE-ME"
+      secret-name: "mvb-agent-secrets"
+    secrets:
+      APPLICATION_SECRETS: ${{ secrets.APPLICATION_SECRETS }}
+      AZURE_SECRETS: ${{ secrets.AZURE_SECRETS }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+  installHelmChart:
+    name: Install Helm Chart on AKS
+    needs: [updateHelmChart, version]
+    uses: innFactory-AI/templates/.github/workflows/install-helm-to-customer-aks.yaml@main
+    permissions: write-all
+    with:
+      image-name: "CHANGE-ME"
+      version: ${{ needs.version.outputs.version }}
+      namespace: "CHANGE-ME"
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN}}
+      AZURE_SECRETS: ${{ secrets.AZURE_SECRETS }}
+      CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      REGISTRY: ${{ secrets.REGISTRY }}
